@@ -7,6 +7,7 @@ import { extractPdfContent, createDocx, createPdf } from "./lib/fileProcessing";
 import { insertDocumentSchema, supportedFormats } from "@shared/schema";
 
 const upload = multer({
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 50 * 1024 * 1024 // 50MB
   }
@@ -24,7 +25,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const originalFormat = req.file.originalname.split(".").pop()?.toLowerCase();
-      if (!supportedFormats.includes(originalFormat as any)) {
+      if (!originalFormat || !supportedFormats.includes(originalFormat as any)) {
         return res.status(400).json({ message: "Unsupported file format" });
       }
 
@@ -58,10 +59,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         downloadUrl
       });
 
-      res.json({ 
-        id: doc.id,
-        downloadUrl
-      });
+      res.json(doc);
     } catch (error) {
       console.error('Error processing document:', error);
       res.status(500).json({ message: error instanceof Error ? error.message : 'An unexpected error occurred' });

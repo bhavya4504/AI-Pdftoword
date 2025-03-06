@@ -20,7 +20,18 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await apiRequest("POST", "/api/convert", formData);
+      // Don't set Content-Type header, let the browser set it with boundary
+      const res = await fetch("/api/convert", {
+        method: "POST",
+        body: formData,
+        credentials: "include"
+      });
+
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || res.statusText);
+      }
+
       const data = await res.json();
       return data as Document;
     },
