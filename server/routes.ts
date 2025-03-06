@@ -52,6 +52,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log(`Converted ${originalFormat} to ${convertedFormat} successfully`);
 
+        // Store the converted buffer
+        await storage.storeBuffer(doc.id, Buffer.from(convertedBuffer));
+
         const downloadUrl = `/api/download/${doc.id}`;
 
         await storage.updateDocument(doc.id, {
@@ -95,10 +98,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Document not found" });
       }
 
-      // Re-convert the document for download
-      const buffer = doc.originalFormat === "pdf"
-        ? await convertPdfToDocx(req.file.buffer)
-        : await convertDocxToPdf(req.file.buffer.toString());
+      const buffer = await storage.getBuffer(doc.id);
+      if (!buffer) {
+        return res.status(404).json({ message: "Converted file not found" });
+      }
 
       res.setHeader('Content-Type', doc.convertedFormat === "pdf" 
         ? 'application/pdf' 
