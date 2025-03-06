@@ -26,6 +26,12 @@ export async function enhanceContent(content: string): Promise<string> {
     }
     return result.enhancedContent;
   } catch (error: any) {
+    // If we hit rate limits or API issues, return the original content
+    console.error('OpenAI enhancement failed:', error);
+    if (error.status === 429) {
+      console.log('Rate limit exceeded, using original content');
+      return `[Note: AI enhancement unavailable]\n\n${content}`;
+    }
     throw new Error(`Failed to enhance content: ${error.message}`);
   }
 }
