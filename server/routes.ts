@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
@@ -12,8 +12,12 @@ const upload = multer({
   }
 });
 
+interface FileRequest extends Request {
+  file?: Express.Multer.File
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.post("/api/convert", upload.single("file"), async (req, res) => {
+  app.post("/api/convert", upload.single("file"), async (req: FileRequest, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -25,7 +29,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const convertedFormat = originalFormat === "pdf" ? "docx" : "pdf";
-      
+
       const doc = await storage.createDocument({
         originalName: req.file.originalname,
         originalFormat,
@@ -59,7 +63,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         downloadUrl
       });
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      console.error('Error processing document:', error);
+      res.status(500).json({ message: error instanceof Error ? error.message : 'An unexpected error occurred' });
     }
   });
 
@@ -71,7 +76,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(doc);
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      console.error('Error fetching document status:', error);
+      res.status(500).json({ message: error instanceof Error ? error.message : 'An unexpected error occurred' });
+    }
+  });
+
+  app.get("/api/download/:id", async (req, res) => {
+    try {
+      const doc = await storage.getDocument(parseInt(req.params.id));
+      if (!doc || !doc.enhancedContent) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      const buffer = doc.convertedFormat === "pdf"
+        ? await createPdf(doc.enhancedContent)
+        : await createDocx(doc.enhancedContent);
+
+      res.setHeader('Content-Type', doc.convertedFormat === "pdf" ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename=${doc.originalName}.${doc.convertedFormat}`);
+      res.send(buffer);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      res.status(500).json({ message: error instanceof Error ? error.message : 'An unexpected error occurred' });
     }
   });
 

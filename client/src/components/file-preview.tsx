@@ -8,8 +8,8 @@ interface FilePreviewProps {
 }
 
 export function FilePreview({ document }: FilePreviewProps) {
-  const { data: doc } = useQuery({
-    queryKey: ["/api/status", document.id],
+  const { data: doc } = useQuery<Document>({
+    queryKey: [`/api/status/${document.id}`],
     enabled: document.status === "pending",
     refetchInterval: (data) => 
       data?.status === "completed" ? false : 1000,
@@ -26,7 +26,7 @@ export function FilePreview({ document }: FilePreviewProps) {
             Converting from {currentDoc.originalFormat} to {currentDoc.convertedFormat}
           </p>
         </div>
-        
+
         {currentDoc.status === "completed" && currentDoc.downloadUrl && (
           <Button asChild>
             <a href={currentDoc.downloadUrl} download>

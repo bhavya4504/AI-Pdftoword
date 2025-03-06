@@ -1,11 +1,11 @@
 import { useCallback, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileType } from "lucide-react";
+import { Upload } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { uploadSchema, type Document } from "@shared/schema";
+import { z } from "zod";
 
 interface FileUploadProps {
   onSuccess: (doc: Document) => void;
@@ -21,7 +21,8 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
       formData.append("file", file);
 
       const res = await apiRequest("POST", "/api/convert", formData);
-      return res.json();
+      const data = await res.json();
+      return data as Document;
     },
     onSuccess: (data) => {
       onSuccess(data);
@@ -30,7 +31,7 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
         description: "File uploaded and processed successfully",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
@@ -47,11 +48,19 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
       uploadSchema.parse({ file });
       uploadMutation.mutate(file);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred",
+          variant: "destructive",
+        });
+      }
     }
   }, [uploadMutation, toast]);
 
