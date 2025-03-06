@@ -2,8 +2,7 @@ import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
-import { enhanceContent } from "./lib/openai";
-import { extractPdfContent, createDocx, createPdf } from "./lib/fileProcessing";
+import { convertPdfToDocx, convertDocxToPdf } from "./lib/fileProcessing";
 import { insertDocumentSchema, supportedFormats } from "@shared/schema";
 
 const upload = multer({
@@ -45,50 +44,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Created document record with ID: ${doc.id}`);
 
-      // Extract content
-      let content: string;
       try {
-        content = originalFormat === "pdf" 
-          ? await extractPdfContent(req.file.buffer)
-          : req.file.buffer.toString();
-        console.log('Content extracted successfully');
+        // Convert the document
+        const convertedBuffer = originalFormat === "pdf"
+          ? await convertPdfToDocx(req.file.buffer)
+          : await convertDocxToPdf(req.file.buffer.toString());
+
+        console.log(`Converted ${originalFormat} to ${convertedFormat} successfully`);
+
+        const downloadUrl = `/api/download/${doc.id}`;
+
+        await storage.updateDocument(doc.id, {
+          status: "completed",
+          downloadUrl
+        });
+
+        console.log('Document conversion completed successfully');
+        res.json(doc);
       } catch (error) {
-        console.error('Error extracting content:', error);
+        console.error('Error converting document:', error);
+        await storage.updateDocument(doc.id, {
+          status: "error",
+          error: error instanceof Error ? error.message : "Failed to convert document"
+        });
         throw error;
       }
-
-      // Enhance content using AI
-      let enhancedContent: string;
-      try {
-        enhancedContent = await enhanceContent(content);
-        console.log('Content enhanced successfully');
-      } catch (error) {
-        console.error('Error enhancing content:', error);
-        throw error;
-      }
-
-      // Convert to target format
-      try {
-        const convertedBuffer = convertedFormat === "pdf"
-          ? await createPdf(enhancedContent)
-          : await createDocx(enhancedContent);
-        console.log(`Converted to ${convertedFormat} successfully`);
-      } catch (error) {
-        console.error('Error converting format:', error);
-        throw error;
-      }
-
-      const downloadUrl = `/api/download/${doc.id}`;
-
-      await storage.updateDocument(doc.id, {
-        status: "completed",
-        content,
-        enhancedContent,
-        downloadUrl
-      });
-
-      console.log('Document processing completed successfully');
-      res.json(doc);
     } catch (error) {
       console.error('Error processing document:', error);
       res.status(500).json({ message: error instanceof Error ? error.message : 'An unexpected error occurred' });
@@ -111,15 +91,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/download/:id", async (req, res) => {
     try {
       const doc = await storage.getDocument(parseInt(req.params.id));
-      if (!doc || !doc.enhancedContent) {
+      if (!doc) {
         return res.status(404).json({ message: "Document not found" });
       }
 
-      const buffer = doc.convertedFormat === "pdf"
-        ? await createPdf(doc.enhancedContent)
-        : await createDocx(doc.enhancedContent);
+      // Re-convert the document for download
+      const buffer = doc.originalFormat === "pdf"
+        ? await convertPdfToDocx(req.file.buffer)
+        : await convertDocxToPdf(req.file.buffer.toString());
 
-      res.setHeader('Content-Type', doc.convertedFormat === "pdf" ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Type', doc.convertedFormat === "pdf" 
+        ? 'application/pdf' 
+        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename=${doc.originalName}.${doc.convertedFormat}`);
       res.send(buffer);
     } catch (error) {

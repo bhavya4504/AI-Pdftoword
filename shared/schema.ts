@@ -8,8 +8,6 @@ export const documents = pgTable("documents", {
   originalFormat: text("original_format").notNull(),
   convertedFormat: text("converted_format").notNull(),
   status: text("status").notNull().default("pending"),
-  content: text("content"),
-  enhancedContent: text("enhanced_content"),
   downloadUrl: text("download_url"),
   error: text("error"),
 });

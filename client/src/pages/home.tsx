@@ -12,10 +12,10 @@ export default function Home() {
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Document Enhancement
+            Document Format Converter
           </h1>
           <p className="text-muted-foreground">
-            Upload your PDF or DOCX files and let AI enhance them for you
+            Convert your documents between PDF and DOCX formats while preserving the original content
           </p>
         </div>
 
