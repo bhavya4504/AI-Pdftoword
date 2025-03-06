@@ -103,10 +103,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Converted file not found" });
       }
 
-      res.setHeader('Content-Type', doc.convertedFormat === "pdf" 
+      // Set correct MIME type based on convertedFormat
+      const mimeType = doc.convertedFormat === "pdf" 
         ? 'application/pdf' 
-        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      res.setHeader('Content-Disposition', `attachment; filename=${doc.originalName}.${doc.convertedFormat}`);
+        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+      // Generate a new filename with the correct extension
+      const baseFileName = doc.originalName.replace(/\.[^/.]+$/, ""); // Remove original extension
+      const newFileName = `${baseFileName}.${doc.convertedFormat}`;
+
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${newFileName}"`);
       res.send(buffer);
     } catch (error) {
       console.error('Error downloading document:', error);
