@@ -20,12 +20,18 @@ interface FileRequest extends Request {
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/convert", upload.single("file"), async (req: FileRequest, res) => {
     try {
+      console.log('Received file upload request');
+
       if (!req.file) {
+        console.log('No file received in request');
         return res.status(400).json({ message: "No file uploaded" });
       }
 
+      console.log(`Processing file: ${req.file.originalname}`);
+
       const originalFormat = req.file.originalname.split(".").pop()?.toLowerCase();
       if (!originalFormat || !supportedFormats.includes(originalFormat as any)) {
+        console.log(`Unsupported format: ${originalFormat}`);
         return res.status(400).json({ message: "Unsupported file format" });
       }
 
@@ -37,18 +43,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         convertedFormat
       });
 
+      console.log(`Created document record with ID: ${doc.id}`);
+
       // Extract content
-      const content = originalFormat === "pdf" 
-        ? await extractPdfContent(req.file.buffer)
-        : req.file.buffer.toString();
+      let content: string;
+      try {
+        content = originalFormat === "pdf" 
+          ? await extractPdfContent(req.file.buffer)
+          : req.file.buffer.toString();
+        console.log('Content extracted successfully');
+      } catch (error) {
+        console.error('Error extracting content:', error);
+        throw error;
+      }
 
       // Enhance content using AI
-      const enhancedContent = await enhanceContent(content);
+      let enhancedContent: string;
+      try {
+        enhancedContent = await enhanceContent(content);
+        console.log('Content enhanced successfully');
+      } catch (error) {
+        console.error('Error enhancing content:', error);
+        throw error;
+      }
 
       // Convert to target format
-      const convertedBuffer = convertedFormat === "pdf"
-        ? await createPdf(enhancedContent)
-        : await createDocx(enhancedContent);
+      try {
+        const convertedBuffer = convertedFormat === "pdf"
+          ? await createPdf(enhancedContent)
+          : await createDocx(enhancedContent);
+        console.log(`Converted to ${convertedFormat} successfully`);
+      } catch (error) {
+        console.error('Error converting format:', error);
+        throw error;
+      }
 
       const downloadUrl = `/api/download/${doc.id}`;
 
@@ -59,6 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         downloadUrl
       });
 
+      console.log('Document processing completed successfully');
       res.json(doc);
     } catch (error) {
       console.error('Error processing document:', error);
