@@ -1,7 +1,7 @@
 import { readFile } from "fs/promises";
 // @ts-ignore
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
-import { Document, Packer, convertInchesToTwip, PageOrientation } from "docx";
+import pdfParse from "pdf-parse";
+import { Document, Packer, convertInchesToTwip, PageOrientation, Paragraph } from "docx";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 export async function extractPdfContent(buffer: Buffer): Promise<string> {
@@ -37,15 +37,13 @@ export async function convertPdfToDocx(buffer: Buffer): Promise<Buffer> {
             },
           },
         },
-        children: pdfData.text.split('\n').map(line => ({
+        children: pdfData.text.split('\n').map(line => new Paragraph({
           text: line,
           spacing: {
             line: 360, // equivalent to 1.5 line spacing
           },
-          font: {
-            name: "Times New Roman",
-            size: 12,
-          },
+          font: "Times New Roman",
+          style: "Normal",
         })),
       }],
     });

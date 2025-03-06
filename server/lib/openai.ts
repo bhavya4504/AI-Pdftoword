@@ -1,8 +1,19 @@
 import OpenAI from "openai";
+import fs from "fs";
+import pdf from "pdf-parse";
+import { Document, Packer, Paragraph } from "docx";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+// Initialize OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Extract text from PDF
+async function extractTextFromPDF(pdfPath: string): Promise<string> {
+  const dataBuffer = fs.readFileSync(pdfPath);
+  const data = await pdf(dataBuffer);
+  return data.text;
+}
+
+// Enhance content using OpenAI
 export async function enhanceContent(content: string): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
@@ -10,28 +21,53 @@ export async function enhanceContent(content: string): Promise<string> {
       messages: [
         {
           role: "system",
-          content: "You are an expert document formatter. Your task is to enhance the given document content while preserving its structure and meaning. Focus on improving readability, formatting, and visual appeal. Return the enhanced content in a JSON object with an 'enhancedContent' field."
+          content:
+            "You are an expert document formatter. Enhance the content for better readability and structure while preserving the original meaning.",
         },
         {
           role: "user",
-          content
-        }
+          content,
+        },
       ],
-      response_format: { type: "json_object" }
     });
 
-    const result = JSON.parse(response.choices[0].message.content || "{}");
-    if (!result.enhancedContent) {
-      throw new Error("Invalid response format from OpenAI");
-    }
-    return result.enhancedContent;
+    return response.choices[0]?.message?.content ?? content;
   } catch (error: any) {
-    // If we hit rate limits or API issues, return the original content
-    console.error('OpenAI enhancement failed:', error);
-    if (error.status === 429) {
-      console.log('Rate limit exceeded, using original content');
-      return `[Note: AI enhancement unavailable]\n\n${content}`;
-    }
-    throw new Error(`Failed to enhance content: ${error.message}`);
+    console.error("OpenAI enhancement failed:", error);
+    return `[Note: AI enhancement unavailable]\n\n${content}`;
   }
 }
+
+// Convert enhanced content to DOCX
+async function saveToDocx(enhancedText: string, outputPath: string) {
+  const doc = new Document({
+    sections: [
+      {
+        children: enhancedText.split("\n").map((line) => new Paragraph(line)),
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  fs.writeFileSync(outputPath, buffer);
+  console.log(`File saved to: ${outputPath}`);
+}
+
+// Main function
+async function processDocument(inputPdfPath: string, outputDocxPath: string) {
+  try {
+    console.log("Extracting text from PDF...");
+    const pdfText = await extractTextFromPDF(inputPdfPath);
+
+    console.log("Enhancing content using OpenAI...");
+    const enhancedText = await enhanceContent(pdfText);
+
+    console.log("Saving enhanced content to DOCX...");
+    await saveToDocx(enhancedText, outputDocxPath);
+  } catch (error) {
+    console.error("Error processing document:", error);
+  }
+}
+
+// Usage
+processDocument("input.pdf", "output.docx");
