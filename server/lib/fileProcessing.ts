@@ -1,13 +1,17 @@
 import { readFile } from "fs/promises";
-import * as pdfParse from "pdf-parse/lib/pdf-parse.js";
+// @ts-ignore
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import { Document, Packer, Paragraph } from "docx";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 export async function extractPdfContent(buffer: Buffer): Promise<string> {
   try {
+    console.log('Starting PDF content extraction...');
     const data = await pdfParse(buffer);
+    console.log('PDF content extracted successfully');
     return data.text;
   } catch (error: any) {
+    console.error('PDF parsing error:', error);
     throw new Error(`Failed to extract PDF content: ${error.message}`);
   }
 }
@@ -25,6 +29,7 @@ export async function createDocx(content: string): Promise<Buffer> {
 
     return await Packer.toBuffer(doc);
   } catch (error: any) {
+    console.error('DOCX creation error:', error);
     throw new Error(`Failed to create DOCX: ${error.message}`);
   }
 }
@@ -53,6 +58,7 @@ export async function createPdf(content: string): Promise<Uint8Array> {
 
     return await pdfDoc.save();
   } catch (error: any) {
+    console.error('PDF creation error:', error);
     throw new Error(`Failed to create PDF: ${error.message}`);
   }
 }
